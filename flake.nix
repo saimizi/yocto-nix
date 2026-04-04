@@ -1,40 +1,57 @@
 {
-  description = "Yocto Project development environment with repo tool and version-safe fallbacks";
+  description = "Yocto Scarthgap devshell (Nix-safe, locale-safe, BitBake-safe)";
 
-  # Pinned to nixos-24.11 for Yocto Scarthgap compatibility:
-  # provides GCC 13 (gnu17 default) and Python 3.12 (has 'pipes' module).
-  # Avoid nixpkgs unstable — GCC 15 defaults to gnu23 and Python 3.13
-  # removes 'pipes', both of which break native recipe builds.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    { self, nixpkgs }:
     let
       system = "x86_64-linux";
-      pkgs = import nixpkgs { inherit system; };
+      pkgs = import nixpkgs {
+        inherit system;
+        config = {
+          allowUnfree = true;
+          glibcLocales.enableAllLocales = true;
+        };
+      };
 
-      # Fallback for pseudo (Yocto's fakeroot replacement)
-      pseudoPkg =
-        if pkgs ? pseudo then pkgs.pseudo
-        else if pkgs ? pseudo-native then pkgs.pseudo-native
-        else pkgs.emptyFile;
-
-      # lz4 with lz4c symlink (Yocto expects lz4c)
-      lz4WithLz4c = pkgs.runCommand "lz4-with-lz4c" {} ''
+      # lz4c symlink (Yocto expects lz4c)
+      lz4WithLz4c = pkgs.runCommand "lz4-with-lz4c" { } ''
         mkdir -p $out/bin
         ln -s ${pkgs.lz4.out}/bin/lz4 $out/bin/lz4c
       '';
 
-      # repo (Google's manifest tool)
+      # repo tool (git-repo / repo)
       repoTool =
-        if pkgs ? gitRepo then pkgs.gitRepo
-        else if pkgs ? repo then pkgs.repo
-        else throw "Neither gitRepo nor repo found in nixpkgs";
-    in {
+        if pkgs ? gitRepo then
+          pkgs.gitRepo
+        else if pkgs ? repo then
+          pkgs.repo
+        else
+          throw "Neither gitRepo nor repo found in nixpkgs";
+    in
+    {
       devShells.${system}.default = pkgs.mkShell {
-        name = "yocto-devshell";
+        name = "yocto-scarthgap-devshell";
+
+        # --- Locale: make BitBake happy, Nix-style ---
+        LANG = "en_US.UTF-8";
+        LC_ALL = "en_US.UTF-8";
+        LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
+
+        # Ubuntu24.04 disables unprivileged user namespace
+        # which make bitbake can't set '/proc/self/uid_map' for network
+        # isolation.
+        BB_DISABLE_NETWORK_SANDBOX = "1";
+
+        # Scarthgap: ONLY this is honored, EXTRAWHITE is rejected
+        #BB_ENV_PASSTHROUGH_ADDITIONS = "LANG LC_ALL LOCALE_ARCHIVE";
+
+        # Optional: also pass through to tasks
+        BB_ENV_PASSTHROUGH_ADDITIONS = "LANG LC_ALL LOCALE_ARCHIVE BB_DISABLE_NETWORK_SANDBOX";
 
         buildInputs = [
-          # Yocto host tools
+          # Yocto host tools (from docs)
           pkgs.git
           pkgs.gawk
           pkgs.wget
@@ -46,8 +63,8 @@
           pkgs.unzip
           pkgs.xz
           pkgs.bzip2
-          pkgs.gcc-unwrapped
           pkgs.gcc
+          pkgs.gcc-unwrapped
           pkgs.gnumake
           pkgs.python3
           pkgs.python3Packages.pip
@@ -56,7 +73,6 @@
           pkgs.python3Packages.pyelftools
           pkgs.python3Packages.jinja2
           pkgs.python3Packages.pyyaml
-          pkgs.locale
           pkgs.which
           pkgs.file
           pkgs.patch
@@ -67,27 +83,23 @@
           pkgs.zstd
           pkgs.lz4
           lz4WithLz4c
-
-          # repo tool (native or fallback)
           repoTool
-
-          # pseudo (native or fallback)
-          pseudoPkg
           pkgs.glibcLocales
         ];
 
         shellHook = ''
-          export LOCALE_ARCHIVE="${pkgs.glibcLocales}/lib/locale/locale-archive"
-          export LC_ALL=en_US.UTF-8
-          export LANG=en_US.UTF-8
-          export LANGUAGE=en_US.UTF-8
-          export BB_ENV_PASSTHROUGH_ADDITIONS="LANG LC_ALL LOCALE_ARCHIVE";
-
-          echo "Yocto + repo environment loaded."
-          echo "Use: repo init -u <manifest> && repo sync"
-          echo "Then: source oe-init-build-env"
+          echo "Yocto Scarthgap Nix devshell loaded."
+          echo "LANG=$LANG"
+          echo "LC_ALL=$LC_ALL"
+          echo "LOCALE_ARCHIVE=$LOCALE_ARCHIVE"
+          echo "BB_ENV_PASSTHROUGH_ADDITIONS=$BB_ENV_PASSTHROUGH_ADDITIONS"
+          echo "BB_DISABLE_NETWORK_SANDBOX=$BB_DISABLE_NETWORK_SANDBOX"
+          echo
+          echo "Typical flow:"
+          echo "  repo init -u <manifest> && repo sync"
+          echo "  source oe-init-build-env build-test"
+          echo "  bitbake core-image-minimal"
         '';
       };
     };
 }
-
