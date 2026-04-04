@@ -39,16 +39,11 @@
         LC_ALL = "en_US.UTF-8";
         LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
 
-        # Ubuntu24.04 disables unprivileged user namespace
-        # which make bitbake can't set '/proc/self/uid_map' for network
-        # isolation.
-        BB_DISABLE_NETWORK_SANDBOX = "1";
-
         # Scarthgap: ONLY this is honored, EXTRAWHITE is rejected
         #BB_ENV_PASSTHROUGH_ADDITIONS = "LANG LC_ALL LOCALE_ARCHIVE";
 
         # Optional: also pass through to tasks
-        BB_ENV_PASSTHROUGH_ADDITIONS = "LANG LC_ALL LOCALE_ARCHIVE BB_DISABLE_NETWORK_SANDBOX";
+        BB_ENV_PASSTHROUGH_ADDITIONS = "LANG LC_ALL LOCALE_ARCHIVE";
 
         buildInputs = [
           # Yocto host tools (from docs)
@@ -93,7 +88,6 @@
           echo "LC_ALL=$LC_ALL"
           echo "LOCALE_ARCHIVE=$LOCALE_ARCHIVE"
           echo "BB_ENV_PASSTHROUGH_ADDITIONS=$BB_ENV_PASSTHROUGH_ADDITIONS"
-          echo "BB_DISABLE_NETWORK_SANDBOX=$BB_DISABLE_NETWORK_SANDBOX"
           echo
           echo "Typical flow:"
           echo "  repo init -u <manifest> && repo sync"
