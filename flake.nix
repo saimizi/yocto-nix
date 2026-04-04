@@ -1,7 +1,11 @@
 {
   description = "Yocto Project development environment with repo tool and version-safe fallbacks";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs";
+  # Pinned to nixos-24.11 for Yocto Scarthgap compatibility:
+  # provides GCC 13 (gnu17 default) and Python 3.12 (has 'pipes' module).
+  # Avoid nixpkgs unstable — GCC 15 defaults to gnu23 and Python 3.13
+  # removes 'pipes', both of which break native recipe builds.
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
 
   outputs = { self, nixpkgs }:
     let
@@ -42,8 +46,8 @@
           pkgs.unzip
           pkgs.xz
           pkgs.bzip2
-          pkgs.gcc
           pkgs.gcc-unwrapped
+          pkgs.gcc
           pkgs.gnumake
           pkgs.python3
           pkgs.python3Packages.pip
@@ -69,9 +73,11 @@
 
           # pseudo (native or fallback)
           pseudoPkg
+          pkgs.glibcLocales
         ];
 
         shellHook = ''
+          export LOCALE_ARCHIVE="${pkgs.glibcLocales}/lib/locale/locale-archive"
           export LC_ALL=en_US.UTF-8
           export LANG=en_US.UTF-8
           export LANGUAGE=en_US.UTF-8
