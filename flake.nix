@@ -81,6 +81,7 @@
           export LC_ALL=en_US.UTF-8
           export LANG=en_US.UTF-8
           export LANGUAGE=en_US.UTF-8
+          export BB_ENV_PASSTHROUGH_ADDITIONS="LANG LC_ALL LOCALE_ARCHIVE";
 
           echo "Yocto + repo environment loaded."
           echo "Use: repo init -u <manifest> && repo sync"
